@@ -41,6 +41,8 @@
 #include <QApplication>
 #include <QDate>
 #include <QLocale>
+#include <QVector3D>
+#include <QVector4D>
 #include "qtpropertymanager.h"
 #include "qtvariantproperty.h"
 #include "qttreepropertybrowser.h"
@@ -188,6 +190,11 @@ int main(int argc, char **argv)
     topItem->addSubProperty(item);
 
     item = variantManager->addProperty(QVariant::Vector3D, QString::number(i++) + QLatin1String(" Vector3D Property"));
+    item->setValue(QVector3D(1.23, -1.23, 3.14));
+    topItem->addSubProperty(item);
+
+    item = variantManager->addProperty(QVariant::Vector4D, QString::number(i++) + QLatin1String(" Vector4D Property"));
+    item->setValue(QVector4D(3.44, -1.65, 0.14, 1.0));
     topItem->addSubProperty(item);
 
     QtVariantEditorFactory *variantFactory = new QtVariantEditorFactory();

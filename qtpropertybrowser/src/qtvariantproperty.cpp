@@ -47,6 +47,7 @@
 #include <QDate>
 #include <QLocale>
 #include <QVector3D>
+#include <QVector4D>
 
 #if defined(Q_CC_MSVC)
 #    pragma warning(disable: 4786) /* MS VS 6: truncating debug info after 255 characters */
@@ -327,6 +328,8 @@ public:
     void slotValueChanged(QtProperty *property, const QLocale &val);
     void slotValueChanged(QtProperty *property, const QPoint &val);
     void slotValueChanged(QtProperty *property, const QPointF &val);
+    void slotValueChanged(QtProperty *property, const QVector3D &val);
+    void slotValueChanged(QtProperty *property, const QVector4D &val);
     void slotValueChanged(QtProperty *property, const QSize &val);
     void slotRangeChanged(QtProperty *property, const QSize &min, const QSize &max);
     void slotValueChanged(QtProperty *property, const QSizeF &val);
@@ -612,6 +615,16 @@ void QtVariantPropertyManagerPrivate::slotValueChanged(QtProperty *property, con
 }
 
 void QtVariantPropertyManagerPrivate::slotValueChanged(QtProperty *property, const QPointF &val)
+{
+    valueChanged(property, QVariant(val));
+}
+
+void QtVariantPropertyManagerPrivate::slotValueChanged(QtProperty *property, const QVector3D &val)
+{
+    valueChanged(property, QVariant(val));
+}
+
+void QtVariantPropertyManagerPrivate::slotValueChanged(QtProperty *property, const QVector4D &val)
 {
     valueChanged(property, QVariant(val));
 }
@@ -1115,8 +1128,8 @@ QtVariantPropertyManager::QtVariantPropertyManager(QObject *parent)
     d_ptr->m_typeToValueType[QVariant::Vector3D] = QVariant::Vector3D;
     d_ptr->m_typeToAttributeToAttributeType[QVariant::Vector3D][d_ptr->m_decimalsAttribute] =
             QVariant::Int;
-    connect(vector3dPropertyManager, SIGNAL(valueChanged(QtProperty *, const Vector3D &)),
-                this, SLOT(slotValueChanged(QtProperty *, const Vector3D &)));
+    connect(vector3dPropertyManager, SIGNAL(valueChanged(QtProperty *, const QVector3D &)),
+                this, SLOT(slotValueChanged(QtProperty *, const QVector3D &)));
     connect(vector3dPropertyManager, SIGNAL(decimalsChanged(QtProperty *, int)),
                 this, SLOT(slotDecimalsChanged(QtProperty *, int)));
     connect(vector3dPropertyManager->subDoublePropertyManager(), SIGNAL(valueChanged(QtProperty *, double)),
@@ -1124,6 +1137,22 @@ QtVariantPropertyManager::QtVariantPropertyManager(QObject *parent)
     connect(vector3dPropertyManager, SIGNAL(propertyInserted(QtProperty *, QtProperty *, QtProperty *)),
                 this, SLOT(slotPropertyInserted(QtProperty *, QtProperty *, QtProperty *)));
     connect(vector3dPropertyManager, SIGNAL(propertyRemoved(QtProperty *, QtProperty *)),
+                this, SLOT(slotPropertyRemoved(QtProperty *, QtProperty *)));
+    // Vector4dPropertyManager
+    QtVector4dPropertyManager *vector4dPropertyManager = new QtVector4dPropertyManager(this);
+    d_ptr->m_typeToPropertyManager[QVariant::Vector4D] = vector4dPropertyManager;
+    d_ptr->m_typeToValueType[QVariant::Vector4D] = QVariant::Vector4D;
+    d_ptr->m_typeToAttributeToAttributeType[QVariant::Vector4D][d_ptr->m_decimalsAttribute] =
+            QVariant::Int;
+    connect(vector4dPropertyManager, SIGNAL(valueChanged(QtProperty *, const QVector4D &)),
+                this, SLOT(slotValueChanged(QtProperty *, const QVector4D &)));
+    connect(vector4dPropertyManager, SIGNAL(decimalsChanged(QtProperty *, int)),
+                this, SLOT(slotDecimalsChanged(QtProperty *, int)));
+    connect(vector4dPropertyManager->subDoublePropertyManager(), SIGNAL(valueChanged(QtProperty *, double)),
+                this, SLOT(slotValueChanged(QtProperty *, double)));
+    connect(vector4dPropertyManager, SIGNAL(propertyInserted(QtProperty *, QtProperty *, QtProperty *)),
+                this, SLOT(slotPropertyInserted(QtProperty *, QtProperty *, QtProperty *)));
+    connect(vector4dPropertyManager, SIGNAL(propertyRemoved(QtProperty *, QtProperty *)),
                 this, SLOT(slotPropertyRemoved(QtProperty *, QtProperty *)));
     // SizePropertyManager
     QtSizePropertyManager *sizePropertyManager = new QtSizePropertyManager(this);
@@ -1419,6 +1448,10 @@ QVariant QtVariantPropertyManager::value(const QtProperty *property) const
         return pointManager->value(internProp);
     } else if (QtPointFPropertyManager *pointFManager = qobject_cast<QtPointFPropertyManager *>(manager)) {
         return pointFManager->value(internProp);
+    } else if (QtVector3dPropertyManager *vector3dManager = qobject_cast<QtVector3dPropertyManager *>(manager)) {
+        return vector3dManager->value(internProp);
+    } else if (QtVector4dPropertyManager *vector4dManager = qobject_cast<QtVector4dPropertyManager *>(manager)) {
+        return vector4dManager->value(internProp);
     } else if (QtSizePropertyManager *sizeManager = qobject_cast<QtSizePropertyManager *>(manager)) {
         return sizeManager->value(internProp);
     } else if (QtSizeFPropertyManager *sizeFManager = qobject_cast<QtSizeFPropertyManager *>(manager)) {
@@ -1558,9 +1591,13 @@ QVariant QtVariantPropertyManager::attributeValue(const QtProperty *property, co
             return pointFManager->decimals(internProp);
         return QVariant();
     } else if (QtVector3dPropertyManager *vector3dManager = qobject_cast<QtVector3dPropertyManager *>(manager)) {
-      if (attribute == d_ptr->m_decimalsAttribute)
-          return vector3dManager->decimals(internProp);
-      return QVariant();
+        if (attribute == d_ptr->m_decimalsAttribute)
+            return vector3dManager->decimals(internProp);
+        return QVariant();
+    } else if (QtVector4dPropertyManager *vector4dManager = qobject_cast<QtVector4dPropertyManager *>(manager)) {
+        if (attribute == d_ptr->m_decimalsAttribute)
+            return vector4dManager->decimals(internProp);
+        return QVariant();
     } else if (QtSizePropertyManager *sizeManager = qobject_cast<QtSizePropertyManager *>(manager)) {
         if (attribute == d_ptr->m_maximumAttribute)
             return sizeManager->maximum(internProp);
@@ -1705,6 +1742,12 @@ void QtVariantPropertyManager::setValue(QtProperty *property, const QVariant &va
     } else if (QtPointFPropertyManager *pointFManager = qobject_cast<QtPointFPropertyManager *>(manager)) {
         pointFManager->setValue(internProp, qVariantValue<QPointF>(val));
         return;
+    } else if (QtVector3dPropertyManager *vector3dManager = qobject_cast<QtVector3dPropertyManager *>(manager)) {
+        vector3dManager->setValue(internProp, qVariantValue<QVector3D>(val));
+        return;
+    } else if (QtVector4dPropertyManager *vector4dManager = qobject_cast<QtVector4dPropertyManager *>(manager)) {
+        vector4dManager->setValue(internProp, qVariantValue<QVector4D>(val));
+        return;
     } else if (QtSizePropertyManager *sizeManager = qobject_cast<QtSizePropertyManager *>(manager)) {
         sizeManager->setValue(internProp, qVariantValue<QSize>(val));
         return;
@@ -1820,6 +1863,10 @@ void QtVariantPropertyManager::setAttribute(QtProperty *property,
         if (attribute == d_ptr->m_decimalsAttribute)
             vector3dManager->setDecimals(internProp, qVariantValue<int>(value));
         return;
+    } else if (QtVector4dPropertyManager *vector4dManager = qobject_cast<QtVector4dPropertyManager *>(manager)) {
+        if (attribute == d_ptr->m_decimalsAttribute)
+            vector4dManager->setDecimals(internProp, qVariantValue<int>(value));
+        return;
     } else if (QtSizePropertyManager *sizeManager = qobject_cast<QtSizePropertyManager *>(manager)) {
         if (attribute == d_ptr->m_maximumAttribute)
             sizeManager->setMaximum(internProp, qVariantValue<QSize>(value));
@@ -1873,6 +1920,7 @@ bool QtVariantPropertyManager::hasValue(const QtProperty *property) const
 QString QtVariantPropertyManager::valueText(const QtProperty *property) const
 {
     const QtProperty *internProp = propertyToWrappedProperty()->value(property, 0);
+    QString output = internProp ? !internProp->displayText().isEmpty() ? internProp->displayText() : internProp->valueText() : QString();
     return internProp ? !internProp->displayText().isEmpty() ? internProp->displayText() : internProp->valueText() : QString();
 }
 

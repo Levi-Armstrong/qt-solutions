@@ -56,6 +56,7 @@
 #include <QCheckBox>
 #include <QLineEdit>
 #include <QVector3D>
+#include <QVector4D>
 
 #include <limits.h>
 #include <float.h>
@@ -3487,6 +3488,334 @@ void QtVector3dPropertyManager::uninitializeProperty(QtProperty *property)
     }
     d_ptr->m_propertyToZ.remove(property);
 
+
+    d_ptr->m_values.remove(property);
+}
+
+// QtVector4dPropertyManager
+
+class QtVector4dPropertyManagerPrivate
+{
+    QtVector4dPropertyManager *q_ptr;
+    Q_DECLARE_PUBLIC(QtVector4dPropertyManager)
+public:
+
+    struct Data
+    {
+      Data() : decimals(2) {}
+        QVector4D val;
+        int decimals;
+    };
+
+    void slotDoubleChanged(QtProperty *property, double value);
+    void slotPropertyDestroyed(QtProperty *property);
+
+    typedef QMap<const QtProperty *, Data> PropertyValueMap;
+    PropertyValueMap m_values;
+
+    QtDoublePropertyManager *m_doublePropertyManager;
+
+    QMap<const QtProperty *, QtProperty *> m_propertyToX;
+    QMap<const QtProperty *, QtProperty *> m_propertyToY;
+    QMap<const QtProperty *, QtProperty *> m_propertyToZ;
+    QMap<const QtProperty *, QtProperty *> m_propertyToW;
+
+    QMap<const QtProperty *, QtProperty *> m_xToProperty;
+    QMap<const QtProperty *, QtProperty *> m_yToProperty;
+    QMap<const QtProperty *, QtProperty *> m_zToProperty;
+    QMap<const QtProperty *, QtProperty *> m_wToProperty;
+};
+
+void QtVector4dPropertyManagerPrivate::slotDoubleChanged(QtProperty *property, double value)
+{
+    if (QtProperty *prop = m_xToProperty.value(property, 0)) {
+        QVector4D p = m_values[prop].val;
+        p.setX(value);
+        q_ptr->setValue(prop, p);
+    } else if (QtProperty *prop = m_yToProperty.value(property, 0)) {
+        QVector4D p = m_values[prop].val;
+        p.setY(value);
+        q_ptr->setValue(prop, p);
+    } else if (QtProperty *prop = m_zToProperty.value(property, 0)) {
+        QVector4D p = m_values[prop].val;
+        p.setZ(value);
+        q_ptr->setValue(prop, p);
+    } else if (QtProperty *prop = m_wToProperty.value(property, 0)) {
+        QVector4D p = m_values[prop].val;
+        p.setW(value);
+        q_ptr->setValue(prop, p);
+    }
+}
+
+void QtVector4dPropertyManagerPrivate::slotPropertyDestroyed(QtProperty *property)
+{
+    if (QtProperty *vector4dProp  = m_xToProperty.value(property, 0)) {
+        m_propertyToX[vector4dProp] = 0;
+        m_xToProperty.remove(property);
+    } else if (QtProperty *vector4dProp = m_yToProperty.value(property, 0)) {
+        m_propertyToY[vector4dProp] = 0;
+        m_yToProperty.remove(property);
+    } else if (QtProperty *vector4dProp = m_zToProperty.value(property, 0)) {
+        m_propertyToZ[vector4dProp] = 0;
+        m_zToProperty.remove(property);
+    } else if (QtProperty *vector4dProp = m_wToProperty.value(property, 0)) {
+        m_propertyToW[vector4dProp] = 0;
+        m_wToProperty.remove(property);
+    }
+}
+
+/*! \class QtVector4dPropertyManager
+
+    \brief The QtVector4dPropertyManager provides and manages QVector4D properties.
+
+    A vector 3D property has nested \e x, \e y, \e z and \e w subproperties. The
+    top-level property's value can be retrieved using the value()
+    function, and set using the setValue() slot.
+
+    The subproperties are created by a QtDoublePropertyManager object. This
+    manager can be retrieved using the subDoublePropertyManager() function. In
+    order to provide editing widgets for the subproperties in a
+    property browser widget, this manager must be associated with an
+    editor factory.
+
+    In addition, QtVector4dPropertyManager provides the valueChanged() signal which
+    is emitted whenever a property created by this manager changes.
+
+    \sa QtAbstractPropertyManager, QtDoublePropertyManager, QtVector4dPropertyManager
+*/
+
+/*!
+    \fn void QtVector4dPropertyManager::valueChanged(QtProperty *property, const QVector4d &value)
+
+    This signal is emitted whenever a property created by this manager
+    changes its value, passing a pointer to the \a property and the
+    new \a value as parameters.
+
+    \sa setValue()
+*/
+
+/*!
+    \fn void QtVector4dPropertyManager::decimalsChanged(QtProperty *property, int prec)
+
+    This signal is emitted whenever a property created by this manager
+    changes its precision of value, passing a pointer to the
+    \a property and the new \a prec value
+
+    \sa setDecimals()
+*/
+
+/*!
+    Creates a manager with the given \a parent.
+*/
+QtVector4dPropertyManager::QtVector4dPropertyManager(QObject *parent)
+    : QtAbstractPropertyManager(parent)
+{
+    d_ptr = new QtVector4dPropertyManagerPrivate;
+    d_ptr->q_ptr = this;
+
+    d_ptr->m_doublePropertyManager = new QtDoublePropertyManager(this);
+    connect(d_ptr->m_doublePropertyManager, SIGNAL(valueChanged(QtProperty *, double)),
+                this, SLOT(slotDoubleChanged(QtProperty *, double)));
+    connect(d_ptr->m_doublePropertyManager, SIGNAL(propertyDestroyed(QtProperty *)),
+                this, SLOT(slotPropertyDestroyed(QtProperty *)));
+}
+
+/*!
+    Destroys this manager, and all the properties it has created.
+*/
+QtVector4dPropertyManager::~QtVector4dPropertyManager()
+{
+    clear();
+    delete d_ptr;
+}
+
+/*!
+    Returns the manager that creates the nested \e x and \e y
+    subproperties.
+
+    In order to provide editing widgets for the subproperties in a
+    property browser widget, this manager must be associated with an
+    editor factory.
+
+    \sa QtAbstractPropertyBrowser::setFactoryForManager()
+*/
+QtDoublePropertyManager *QtVector4dPropertyManager::subDoublePropertyManager() const
+{
+    return d_ptr->m_doublePropertyManager;
+}
+
+/*!
+    Returns the given \a property's value.
+
+    If the given \a property is not managed by this manager, this
+    function returns a point with coordinates (0, 0).
+
+    \sa setValue()
+*/
+QVector4D QtVector4dPropertyManager::value(const QtProperty *property) const
+{
+    return getValue<QVector4D>(d_ptr->m_values, property);
+}
+
+/*!
+    Returns the given \a property's precision, in decimals.
+
+    \sa setDecimals()
+*/
+int QtVector4dPropertyManager::decimals(const QtProperty *property) const
+{
+    return getData<int>(d_ptr->m_values, &QtVector4dPropertyManagerPrivate::Data::decimals, property, 0);
+}
+
+/*!
+    \reimp
+*/
+QString QtVector4dPropertyManager::valueText(const QtProperty *property) const
+{
+    const QtVector4dPropertyManagerPrivate::PropertyValueMap::const_iterator it = d_ptr->m_values.constFind(property);
+    if (it == d_ptr->m_values.constEnd())
+        return QString();
+    const QVector4D v = it.value().val;
+    const int dec =  it.value().decimals;
+    return QString(tr("(%1, %2, %3, %4)").arg(QString::number(v.x(), 'f', dec))
+                                         .arg(QString::number(v.y(), 'f', dec))
+                                         .arg(QString::number(v.z(), 'f', dec))
+                                         .arg(QString::number(v.w(), 'f', dec)));
+}
+
+/*!
+    \fn void QtVector4dPropertyManager::setValue(QtProperty *property, const QVector4D &value)
+
+    Sets the value of the given \a property to \a value. Nested
+    properties are updated automatically.
+
+    \sa value(), valueChanged()
+*/
+void QtVector4dPropertyManager::setValue(QtProperty *property, const QVector4D &val)
+{
+    const QtVector4dPropertyManagerPrivate::PropertyValueMap::iterator it = d_ptr->m_values.find(property);
+    if (it == d_ptr->m_values.end())
+        return;
+
+    if (it.value().val == val)
+        return;
+
+    it.value().val = val;
+    d_ptr->m_doublePropertyManager->setValue(d_ptr->m_propertyToX[property], val.x());
+    d_ptr->m_doublePropertyManager->setValue(d_ptr->m_propertyToY[property], val.y());
+    d_ptr->m_doublePropertyManager->setValue(d_ptr->m_propertyToZ[property], val.z());
+    d_ptr->m_doublePropertyManager->setValue(d_ptr->m_propertyToW[property], val.w());
+
+    emit propertyChanged(property);
+    emit valueChanged(property, val);
+}
+
+/*!
+    \fn void QtVector4dPropertyManager::setDecimals(QtProperty *property, int prec)
+
+    Sets the precision of the given \a property to \a prec.
+
+    The valid decimal range is 0-13. The default is 2.
+
+    \sa decimals()
+*/
+void QtVector4dPropertyManager::setDecimals(QtProperty *property, int prec)
+{
+    const QtVector4dPropertyManagerPrivate::PropertyValueMap::iterator it = d_ptr->m_values.find(property);
+    if (it == d_ptr->m_values.end())
+        return;
+
+    QtVector4dPropertyManagerPrivate::Data data = it.value();
+
+    if (prec > 13)
+        prec = 13;
+    else if (prec < 0)
+        prec = 0;
+
+    if (data.decimals == prec)
+        return;
+
+    data.decimals = prec;
+    d_ptr->m_doublePropertyManager->setDecimals(d_ptr->m_propertyToX[property], prec);
+    d_ptr->m_doublePropertyManager->setDecimals(d_ptr->m_propertyToY[property], prec);
+    d_ptr->m_doublePropertyManager->setDecimals(d_ptr->m_propertyToZ[property], prec);
+    d_ptr->m_doublePropertyManager->setDecimals(d_ptr->m_propertyToW[property], prec);
+
+    it.value() = data;
+
+    emit decimalsChanged(property, data.decimals);
+}
+
+/*!
+    \reimp
+*/
+void QtVector4dPropertyManager::initializeProperty(QtProperty *property)
+{
+    QtVector4dPropertyManagerPrivate::Data data;
+    d_ptr->m_values[property] = data;
+
+
+    QtProperty *xProp = d_ptr->m_doublePropertyManager->addProperty("X");
+    d_ptr->m_doublePropertyManager->setDecimals(xProp, decimals(property));
+    d_ptr->m_doublePropertyManager->setValue(xProp, 0);
+    d_ptr->m_propertyToX[property] = xProp;
+    d_ptr->m_xToProperty[xProp] = property;
+    property->addSubProperty(xProp);
+
+    QtProperty *yProp = d_ptr->m_doublePropertyManager->addProperty("Y");
+    d_ptr->m_doublePropertyManager->setDecimals(yProp, decimals(property));
+    d_ptr->m_doublePropertyManager->setValue(yProp, 0);
+    d_ptr->m_propertyToY[property] = yProp;
+    d_ptr->m_yToProperty[yProp] = property;
+    property->addSubProperty(yProp);
+
+    QtProperty *zProp = d_ptr->m_doublePropertyManager->addProperty("Z");
+    d_ptr->m_doublePropertyManager->setDecimals(zProp, decimals(property));
+    d_ptr->m_doublePropertyManager->setValue(zProp, 0);
+    d_ptr->m_propertyToZ[property] = zProp;
+    d_ptr->m_zToProperty[zProp] = property;
+    property->addSubProperty(zProp);
+
+    QtProperty *wProp = d_ptr->m_doublePropertyManager->addProperty("W");
+    d_ptr->m_doublePropertyManager->setDecimals(wProp, decimals(property));
+    d_ptr->m_doublePropertyManager->setValue(wProp, 0);
+    d_ptr->m_propertyToW[property] = wProp;
+    d_ptr->m_wToProperty[wProp] = property;
+    property->addSubProperty(wProp);
+}
+
+/*!
+    \reimp
+*/
+void QtVector4dPropertyManager::uninitializeProperty(QtProperty *property)
+{
+    QtProperty *xProp = d_ptr->m_propertyToX[property];
+    if (xProp) {
+        d_ptr->m_xToProperty.remove(xProp);
+        delete xProp;
+    }
+    d_ptr->m_propertyToX.remove(property);
+
+    QtProperty *yProp = d_ptr->m_propertyToY[property];
+    if (yProp) {
+        d_ptr->m_yToProperty.remove(yProp);
+        delete yProp;
+    }
+    d_ptr->m_propertyToY.remove(property);
+
+    QtProperty *zProp = d_ptr->m_propertyToZ[property];
+    if (zProp) {
+        d_ptr->m_zToProperty.remove(zProp);
+        delete zProp;
+    }
+    d_ptr->m_propertyToZ.remove(property);
+
+    QtProperty *wProp = d_ptr->m_propertyToW[property];
+    if (wProp) {
+        d_ptr->m_wToProperty.remove(wProp);
+        delete wProp;
+    }
+    d_ptr->m_propertyToW.remove(property);
 
     d_ptr->m_values.remove(property);
 }
